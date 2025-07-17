@@ -5,7 +5,7 @@ Problem statement:
 3	Can we automate the process of setting/planning meeting dates such that
 	A. the meetings are 3 months or more from the expiration date
 	B. set up no more than 2 meetings per subject per week (each subject requires a different analyst)
-	C. set up no more than 5-6 meetings in a single week (for all meetings both Christine and John S. must attend)
+	C. set up no more than 10 meetings in a single week (for all meetings both Christine and John S. must attend)
 	D. no more than 2 meetings/week for a single customer
 	E. need to give the customer 3 options for meeting times to choose from 
 Notes:   1	Each meeting  is 1 hour
@@ -19,3 +19,6 @@ Data Input
 2	Customer /Company name
 3	Customer Type
 4	Subject/Topic
+
+
+(Also take into account different time zones of clients and offer an option of late scheduling)
