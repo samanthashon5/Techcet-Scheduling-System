@@ -1,0 +1,1650 @@
+
+Function ExtractDates(cellVal As String) As String
+    Dim reports() As String
+    Dim report As Variant
+    Dim result  As String
+    Dim datePart As String
+    Dim parts() As String
+    
+    result = ""
+    'split up reports
+    reports = Split(cellVal, vbCrLf)
+    
+    For Each report In reports
+        report = Trim(report)
+        
+        If report <> "" Then
+            If InStr(report, ":") > 0 Then
+                datePart = Mid(report, InStr(report, ":") + 1)
+                datePart = Trim(datePart)
+                
+                If datePart <> "" Then
+                    If result <> "" Then
+                        result = result & ", " & datePart
+                    Else
+                        result = datePart
+                    End If
+                End If
+        End If
+    End If
+    Next report
+    
+    ExtractDates = result
+    
+End Function
+Function GetWeekKey(d As Date) As String
+    GetWeekKey = Year(d) & "-W" & Format(datePart("ww", d, vbMonday, vbFirstFourDays), "00")
+End Function
+
+'no more than 10 meetings in a single week
+Function CountMeetingsInAWeek(tblRange As Range, finalDateString As String, weekKey As String) As Integer
+    Dim existDates As Range
+    Dim cellVal As String
+    Dim dateParts() As String
+    Dim dp As Variant
+    Dim d As Date
+    Dim wk As String
+    Dim count As Integer
+    
+    Dim currDates As String
+    Dim dates() As String
+    Dim dts As Variant
+    Dim currdate As Date
+    count = 0
+    
+   For Each existDates In tblRange
+        If Trim(existDates.Value) <> "" Then
+            'Separate dates
+            cellVal = ExtractDates(existDates.Value)
+            dateParts = Split(cellVal, ",")
+            For Each dp In dateParts
+                On Error Resume Next
+                d = CDate(Trim(dp))
+                On Error GoTo 0
+                
+            If IsDate(d) Then
+                wk = GetWeekKey(d)
+                If wk = weekKey Then
+                    count = count + 1
+                End If
+            End If
+            Next dp
+        End If
+    Next existDates
+    
+    If finalDateString <> "" Then
+        currDates = ExtractDates(finalDateString)
+        dates = Split(currDates, ",")
+        For Each dts In dates
+            On Error Resume Next
+            currdate = CDate(Trim(dp))
+            On Error GoTo 0
+            
+            If IsDate(currdate) Then
+                wk = GetWeekKey(currdate)
+                If wk = weekKey Then
+                    count = count + 1
+                End If
+            End If
+        Next dts
+    End If
+    CountMeetingsInAWeek = count
+End Function
+
+'No more than 2 meetings/subject/week
+Function ReportMeetingsInAWeek(tblRange As Range, weekKey As String, meetTopics As String) As Integer
+    Dim existDates As Range
+    Dim mp As Variant
+    Dim count As Integer
+    Dim cellVal As String
+    Dim reports() As String
+    Dim report As Variant
+    Dim reportDates As String
+    Dim dateParts() As String
+    Dim dp As Variant
+    Dim d As Date
+    Dim wk As String
+    Dim meetParts() As String
+    Dim meep As Variant
+    
+    count = 0
+    
+    meetParts = Split(meetTopics, ",")
+    meep = Trim(meep)
+    
+    For Each existDates In tblRange
+        If Trim(existDates.Value) <> "" Then
+            cellVal = existDates.Value
+            reports = Split(cellVal, vbCrLf)
+            For Each mp In meetParts
+                mp = Trim(mp)
+                For Each report In reports
+                    If InStr(report, mp) > 0 Then
+                        reportDates = report
+                        reportDates = ExtractDates(reportDates)
+                        dateParts = Split(reportDates, ",")
+                        For Each dp In dateParts
+                            On Error Resume Next
+                            d = CDate(Trim(dp))
+                            On Error GoTo 0
+                            If IsDate(d) Then
+                                wk = GetWeekKey(d)
+                            If wk = weekKey Then
+                                count = count + 1
+                            End If
+                            End If
+                        Next dp
+                    End If
+                Next report
+            Next mp
+        End If
+    Next existDates
+    
+    ReportMeetingsInAWeek = count
+
+End Function
+
+'No more than 2 meetings/week/customer
+Function CustMeetingsInAWeek(finalDateString As String, weekKey As String) As Integer
+    Dim dateParts() As String
+    Dim dp As Variant
+    Dim d As Date
+    Dim cellVal As String
+    Dim wk As String
+    Dim count As Integer
+    
+    count = 0
+    
+    If finalDateString <> "" Then
+    'Separate dates
+        cellVal = ExtractDates(finalDateString)
+        dateParts = Split(cellVal, ",")
+        For Each dp In dateParts
+            On Error Resume Next
+            d = CDate(Trim(dp))
+            On Error GoTo 0
+            
+        If IsDate(d) Then
+            wk = GetWeekKey(d)
+            If wk = weekKey Then
+                count = count + 1
+            End If
+        End If
+        Next dp
+    End If
+    CustMeetingsInAWeek = count
+End Function
+
+
+'each meeting is 1 hour (30 min in between)
+Function CloseTime(tblRange As Range, currdate As Date) As Boolean
+    For Each existDates In tblRange
+    If Trim(existDates.Value) <> "" Then
+        Dim cellVal As String
+        Dim dateParts() As String
+        Dim dp As Variant
+        Dim existDate As Date
+        
+        CloseTime = False
+        cellVal = ExtractDates(existDates.Value)
+        
+        ' Split cell by commas
+        dateParts = Split(cellVal, ",")
+
+        For Each dp In dateParts
+            On Error Resume Next
+            existDate = CDate(Trim(dp))
+            On Error GoTo 0
+
+            ' Check if time difference is less than 90 minutes
+            If IsDate(existDate) Then
+                If Abs(DateDiff("n", existDate, currdate)) < 90 Then
+                    CloseTime = True
+                    Exit Function
+                End If
+            End If
+        Next dp
+    End If
+Next existDates
+End Function
+
+'check thetime and date of the existing string
+Function CloseTimeString(DateString As String, FullDateTime As Date) As Boolean
+Dim dateParts() As String
+Dim dp As Variant
+Dim existDate As Date
+
+CloseTimeString = False
+    If DateString <> "" Then
+        dateParts = Split(DateString, ",")
+        For Each dp In dateParts
+            On Error Resume Next
+            existDate = CDate(Trim(dp))
+            On Error GoTo 0
+            
+            If IsDate(existDate) Then
+                If Abs(DateDiff("n", existDate, FullDateTime)) < 90 Then
+                    CloseTimeString = True
+                    Exit Function
+                End If
+            End If
+        Next dp
+    End If
+End Function
+
+'check the time and date of the final date string
+Function CloseTimeFinalString(finalDateString As String, FullDateTime As Date) As Boolean
+Dim finalDates As String
+Dim dateParts() As String
+Dim dp As Variant
+Dim existDate As Date
+
+CloseTimeFinalString = False
+    If finalDateString <> "" Then
+        finalDates = ExtractDates(finalDateString)
+        dateParts = Split(finalDates, ",")
+        For Each dp In dateParts
+            On Error Resume Next
+            existDate = CDate(Trim(dp))
+            On Error GoTo 0
+            
+            If IsDate(existDate) Then
+                If Abs(DateDiff("n", existDate, FullDateTime)) < 30 Then
+                    CloseTimeFinalString = True
+                    Exit Function
+                End If
+            End If
+        Next dp
+    End If
+End Function
+
+'split the reports
+Function SplitEveryOtherComma(inputStr As String) As Variant
+    Dim parts() As String
+    Dim result() As String
+    Dim i As Long, j As Long
+    
+    parts = Split(inputStr, ",")
+    ReDim result(0 To (UBound(parts) \ 2)) ' Grouping every 2 items
+
+    j = 0
+    For i = 0 To UBound(parts) Step 2
+        If i + 1 <= UBound(parts) Then
+            result(j) = Trim(parts(i)) & ", " & Trim(parts(i + 1))
+        Else
+            result(j) = Trim(parts(i)) ' handle odd number of items
+        End If
+        j = j + 1
+    Next i
+    
+    SplitEveryOtherComma = result
+End Function
+
+Function PDTwindow() As Boolean
+Dim currYear As Integer
+Dim d As Date
+Dim count As Integer
+Dim secondSundayMarch As Date
+Dim firstSundayNov As Date
+
+PDTwindow = False
+currYear = Year(Date)
+d = DateSerial(currYear, 3, 1)
+count = 0
+Do While count < 2
+    If Weekday(d, vbSunday) = vbSunday Then
+        count = count + 1
+    End If
+    If count < 2 Then d = d + 1
+Loop
+secondSundayMarch = d
+
+d = DateSerial(currYear, 11, 1)
+count = 0
+Do While count < 1
+    If Weekday(d, vbSunday) = vbSunday Then
+        count = count + 1
+    End If
+    If count < 1 Then d = d + 1
+Loop
+firstSundayNov = d
+
+If Date >= secondSundayMarch Then
+    If Date <= firstSundayNov Then
+        PDTwindow = True
+    End If
+End If
+End Function
+'Time Zones
+Function RndTime(TimeZone As String) As Date
+Dim RndHr As Integer
+Dim RndMin As Integer
+Dim options() As Variant
+Dim randIndex As Integer
+
+RndTime = TimeSerial(0, 0, 0)
+RndHr = 0
+RndMin = IIf(Int(Rnd() * 2) = 0, 0, 30)
+
+If PDTwindow = True Then
+Select Case UCase(Trim(TimeZone))
+    Case "GMT-11"
+        options = Array(12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
+    Case "GMT-10"
+        options = Array(11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
+    Case "GMT-9"
+       options = Array(10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
+    Case "GMT-8", "PST"
+        options = Array(9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
+    Case "GMT-7", "PDT", "MST", "PT"
+        options = Array(8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
+    Case "GMT-6", "MDT", "CST", "MT"
+        options = Array(8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)
+    Case "GMT-5", "CDT", "EST", "CT"
+        options = Array(8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19)
+    Case "GMT-4", "EDT", "ET"
+        options = Array(8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18)
+    Case "GMT-3"
+        options = Array(8, 9, 10, 11, 12, 13, 14, 15, 16, 17)
+    Case "GMT-2"
+        options = Array(8, 9, 10, 11, 12, 13, 14, 15, 16)
+    Case "GMT-1"
+        options = Array(8, 9, 10, 11, 12, 13, 14, 15)
+    Case "GMT"
+        options = Array(8, 9, 10, 11, 12, 13, 14)
+    Case "GMT+1"
+        options = Array(8, 9, 10, 11, 12, 13)
+    Case "GMT+2"
+        options = Array(8, 9, 10, 11, 12)
+    Case "GMT+3"
+        options = Array(8, 9, 10, 11)
+    Case "GMT+4"
+        options = Array(8, 9, 10, 21)
+    Case "GMT+5"
+        options = Array(8, 9, 20, 21)
+    Case "GMT+6"
+        options = Array(8, 19, 20, 21)
+    Case "GMT+7"
+        options = Array(18, 19, 20, 21)
+    Case "GMT+8"
+        options = Array(17, 18, 19, 20, 21)
+    Case "GMT+9"
+        options = Array(16, 17, 18, 19, 20, 21)
+    Case "GMT+10"
+        options = Array(15, 16, 17, 18, 19, 20, 21)
+    Case "GMT+11"
+        options = Array(14, 15, 16, 17, 18, 19, 20, 21)
+    Case "GMT+12", "GMT-12"
+        options = Array(13, 14, 15, 16, 17, 18, 19, 20, 21)
+    'If blank just assume PDT
+    Case Else
+        options = Array(8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
+    End Select
+        
+ElseIf PDTwindow = False Then
+    Select Case UCase(Trim(TimeZone))
+    Case "GMT-11"
+        options = Array(11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
+    Case "GMT-10"
+        options = Array(10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
+    Case "GMT-9"
+       options = Array(9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
+    Case "GMT-8", "PST", "PT"
+        options = Array(8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
+    Case "GMT-7", "MST", "MT"
+        options = Array(8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)
+    Case "GMT-6", "MDT", "CST", "CT"
+        options = Array(8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19)
+    Case "GMT-5", "CDT", "EST", "ET"
+        options = Array(8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18)
+    Case "GMT-4", "EDT"
+        options = Array(8, 9, 10, 11, 12, 13, 14, 15, 16, 17)
+    Case "GMT-3"
+        options = Array(8, 9, 10, 11, 12, 13, 14, 15, 16)
+    Case "GMT-2"
+        options = Array(8, 9, 10, 11, 12, 13, 14, 15)
+    Case "GMT-1"
+        options = Array(8, 9, 10, 11, 12, 13, 14)
+    Case "GMT"
+        options = Array(8, 9, 10, 11, 12, 13)
+    Case "GMT+1"
+        options = Array(8, 9, 10, 11, 12)
+    Case "GMT+2"
+        options = Array(8, 9, 10, 11)
+    Case "GMT+3"
+        options = Array(8, 9, 10)
+    Case "GMT+4"
+        options = Array(8, 9, 20, 21)
+    Case "GMT+5"
+        options = Array(8, 9, 19, 20, 21)
+    Case "GMT+6"
+        options = Array(8, 18, 19, 20, 21)
+    Case "GMT+7"
+        options = Array(17, 18, 19, 20, 21)
+    Case "GMT+8"
+        options = Array(16, 17, 18, 19, 20, 21)
+    Case "GMT+9"
+        options = Array(15, 16, 17, 18, 19, 20, 21)
+    Case "GMT+10"
+        options = Array(14, 15, 16, 17, 18, 19, 20, 21)
+    Case "GMT+11"
+        options = Array(13, 14, 15, 16, 17, 18, 19, 20, 21)
+    Case "GMT+12", "GMT-12"
+        options = Array(12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
+    'If blank just assume PT
+    Case Else
+        options = Array(8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
+    End Select
+    
+End If
+
+'prioritize 8am -5pm
+Dim i As Integer
+For i = LBound(options) To UBound(options)
+    If options(i) >= 8 And options(i) <= 17 Then
+        ReDim Preserve options(UBound(options) + 1)
+        options(UBound(options)) = options(i)
+    End If
+Next i
+
+randIndex = Int(Rnd() * UBound(options) + 1)
+RndHr = options(randIndex)
+    
+RndTime = TimeSerial(RndHr, RndMin, 0)
+End Function
+
+
+Sub scheduleMeetings()
+'
+' scheduleMeetings Macro
+' Schedule meetings by first clicking on the client name and then press "schedule meeting" (or Ctrl+Shift+M)
+'
+' Keyboard Shortcut: Ctrl+Shift+M
+'
+Randomize
+
+'Number of meetings according to reports
+Dim meetNum As Long
+Dim cell As Range
+Dim meetTopics As String
+Dim custType As String
+
+'Quarterly Dates
+Dim joinDate As Date
+Dim renewDate As Date
+Dim firstDate As Date
+Dim secondDate As Date
+Dim thirdDate As Date
+Dim lastDate As Date
+Dim startDate As Date
+Dim endDate As Date
+Dim daySpan As Long
+
+'Set a table to avoid date conflicts
+Dim tblRange As Range
+Dim lastRow As Long
+
+'Onboarding Meeting variables
+Dim firstRndDate As Date
+Dim firstDateString As String
+Dim firstRndTime As Date
+Dim firstRndHr As Integer
+Dim firstRndMin As Integer
+Dim firstFullDateTime As Date
+Dim firstFinalDateString As String
+Dim i As Long
+
+'second Meeting variables
+Dim secondRndDate As Date
+Dim secondDateString As String
+Dim secondRndTime As Date
+Dim secondRndHr As Integer
+Dim secondRndMin As Integer
+Dim secondFullDateTime As Date
+Dim j As Long
+Dim secondmpDateString As String
+Dim secondFinalDateString As String
+
+'third Meeting variables
+Dim thirdRndDate As Date
+Dim thirdDateString As String
+Dim thirdRndTime As Date
+Dim thirdRndHr As Integer
+Dim thirdRndMin As Integer
+Dim thirdFullDateTime As Date
+Dim k As Long
+Dim thirdmpDateString As String
+Dim thirdFinalDateString As String
+
+'fourth Meeting variables
+Dim lastRndDate As Date
+Dim lastDateString As String
+Dim lastRndTime As Date
+Dim lastRndHr As Integer
+Dim lastRndMin As Integer
+Dim lastFullDateTime As Date
+Dim n As Long
+Dim lastmpDateString As String
+Dim lastFinalDateString As String
+ 
+ 'Time conflict variables
+Dim weekKey As String
+Dim retryCount As Integer
+
+'Time zone variables
+Dim TimeZone As String
+
+'Meeting Topic variables
+Dim meetParts() As String
+Dim mp As Variant
+Dim l As Long
+Dim meetString As String
+
+'check to see the time frame
+TimeZone = ActiveCell.Offset(0, 1).Value
+    
+'find number of meetings
+    meetNum = 0
+    meetTopics = ""
+    For Each cell In Range(ActiveCell.Offset(0, 7), ActiveCell.Offset(0, 18))
+        If cell.Value > 0 Then
+            meetNum = meetNum + 1
+            meetTopics = meetTopics & CStr(cell.Value) & ", "
+        End If
+    Next cell
+    
+    'get rid of end comma
+    If Right(meetTopics, 2) = ", " Then
+        meetTopics = Left(meetTopics, Len(meetTopics) - 2)
+    End If
+    
+    
+'If DSS Member, 4 meetings per subject
+    If ActiveCell.Offset(0, 2).Value = "DSS Member" Then
+        custType = "DSS"
+        meetNum = Application.WorksheetFunction.Ceiling(meetNum / 2, 1)
+    
+'If not DSS and have two subjects, make one meeting with two subjects
+    Else
+        'fit two topics into one meeting
+        custType = "Other"
+       meetNum = Application.WorksheetFunction.Ceiling(meetNum / 2, 1)
+    End If
+
+'split the meetTopics
+    meetParts() = SplitEveryOtherComma(meetTopics)
+    meetString = ""
+    For Each mp In meetParts
+        meetString = meetString & "1 for " & mp & ", "
+    Next mp
+    
+    'get rid of end comma
+    If Right(meetString, 2) = ", " Then
+        meetString = Left(meetString, Len(meetString) - 2)
+    End If
+    
+    
+'No Topics
+    If meetNum = 0 Then
+        MsgBox "No Meetings To Schedule"
+        Exit Sub
+    End If
+    
+    
+'End Dates
+joinDate = DateValue(ActiveCell.Offset(0, 4))
+renewDate = DateValue(ActiveCell.Offset(0, 5))
+firstDate = DateAdd("d", 14, joinDate)
+secondDate = DateAdd("m", 3, firstDate)
+thirdDate = DateAdd("m", 3, secondDate)
+lastDate = DateAdd("m", 3, thirdDate)
+
+'Renewal Date
+    If DateDiff("d", Date, renewDate) < 0 Then
+        MsgBox "Renewal Date Has Passed"
+        Exit Sub
+    End If
+
+'Set the table to traverse in order to avoid conflict
+'find the last used row from X:AA
+lastRow = Cells(Rows.count, "X").End(xlUp).Row
+If Cells(Rows.count, "Y").End(xlUp).Row > lastRow Then lastRow = Cells(Rows.count, "Y").End(xlUp).Row
+If Cells(Rows.count, "Z").End(xlUp).Row > lastRow Then lastRow = Cells(Rows.count, "Z").End(xlUp).Row
+If Cells(Rows.count, "AA").End(xlUp).Row > lastRow Then lastRow = Cells(Rows.count, "AA").End(xlUp).Row
+
+Set tblRange = Range("X3:AA" & lastRow)
+
+' Ensure startDate is not in the past
+startDate = Application.WorksheetFunction.Max(Date, joinDate)
+endDate = firstDate
+
+daySpan = DateDiff("d", startDate, endDate)
+
+' Make sure the end date is after today
+'only new customers need an onboarding meeting
+If endDate > startDate Then
+'Onboarding Scheduling
+firstFinalDateString = ""
+For i = 1 To 3      'Offer 3 options
+firstdiffDate:
+
+    retryCount = 0
+    Do
+        'find a date that is a week from today and before the end date
+        firstRndDate = startDate + Int(Rnd() * (daySpan + 1))
+        
+        'avoid infinite loops
+        retryCount = retryCount + 1
+        If retryCount > 100 Then
+            MsgBox "Could not find a suitable date after 100 tries."
+            Exit Sub
+        End If
+        
+    'no weekends
+    Loop While Weekday(firstRndDate, vbSunday) = vbSaturday Or Weekday(firstRndDate, vbSunday) = vbSunday
+    
+    'check that there are no more than 10 meetings in a week
+    weekKey = GetWeekKey(firstRndDate)
+    If CountMeetingsInAWeek(tblRange, firstFinalDateString, weekKey) >= 10 Then
+        GoTo firstdiffDate
+    End If
+    
+    
+firstdiffTime:
+    'find a time
+    firstRndTime = RndTime(TimeZone)
+    firstFullDateTime = firstRndDate + firstRndTime
+     
+    'Make sure time and dates don't overlap
+    'every meeting is one hour (30min between each meeting)
+    If CloseTime(tblRange, firstFullDateTime) = True Then
+        GoTo firstdiffTime
+    End If
+    
+    'Make sure time of the same string doesn't overlap
+    If CloseTimeString(firstDateString, firstFullDateTime) = True Then
+        GoTo firstdiffTime
+    End If
+    
+    'add date and time to the possible date options
+    firstDateString = firstDateString & Format(firstFullDateTime, "mm/dd/yyyy hh:mm AM/PM") & ", "
+    
+Next i
+
+   'get rid of end comma
+    If Right(firstDateString, 2) = ", " Then
+        firstFinalDateString = Left(firstDateString, Len(firstDateString) - 2)
+    End If
+    
+    ActiveCell.Offset(0, 23).Value = firstFinalDateString
+
+End If
+
+
+'DSS Members' Quarterly Meeting Scheduling
+If custType = "DSS" Then
+    ' Ensure startDate is not in the past
+    startDate = Application.WorksheetFunction.Max(Date, firstDate)
+    endDate = secondDate
+
+    daySpan = DateDiff("d", startDate, endDate)
+    
+    If endDate > startDate Then
+    'Second Meeting
+        For Each mp In meetParts
+            secondDateString = ""
+            For j = 1 To 3
+seconddiffDate:
+                retryCount = 0
+                Do
+                    'find a date that is a week from today and before the end date
+                    secondRndDate = startDate + Int(Rnd() * (daySpan + 1))
+        
+                    'avoid infinite loops
+                    retryCount = retryCount + 1
+                    If retryCount > 100 Then
+                        MsgBox "Could not find a suitable date after 100 tries."
+                        Exit Sub
+                    End If
+                    
+                'no weekends
+                Loop While Weekday(secondRndDate, vbSunday) = vbSaturday Or Weekday(secondRndDate, vbSunday) = vbSunday
+    
+                'check that there are no more than 10 meetings in a week
+                weekKey = GetWeekKey(secondRndDate)
+                If CountMeetingsInAWeek(tblRange, secondFinalDateString, weekKey) >= 10 Then
+                    GoTo seconddiffDate
+                End If
+    
+                'check that there are no more than 2 meetings per subject per week
+                If ReportMeetingsInAWeek(tblRange, weekKey, meetTopics) >= 2 Then
+                    GoTo seconddiffDate
+                End If
+    
+                'check that there are no more than 2 meetings per customer per week
+                If CustMeetingsInAWeek(secondFinalDateString, weekKey) >= 2 Then
+                    GoTo seconddiffDate
+                End If
+
+secondDiffTime:
+                'find a time
+                secondRndTime = RndTime(TimeZone)
+                secondFullDateTime = secondRndDate + secondRndTime
+    
+                'Make sure time and dates don't overlap
+                'every meeting is one hour (30min between each meeting)
+                If CloseTime(tblRange, secondFullDateTime) = True Then
+                    GoTo secondDiffTime
+                End If
+                
+                'Make sure time of the same string doesn't overlap
+                If CloseTimeString(secondDateString, secondFullDateTime) = True Then
+                    GoTo secondDiffTime
+                End If
+            
+                'Make sure times of the same cell don't overlap
+                If CloseTimeFinalString(secondFinalDateString, secondFullDateTime) = True Then
+                    GoTo secondDiffTime
+                End If
+    
+                'add date and time to the possible date options
+                secondDateString = secondDateString & Format(secondFullDateTime, "mm/dd/yyyy hh:mm AM/PM") & ", "
+
+            Next j
+    
+        'get rid of end comma
+        If Right(secondDateString, 2) = ", " Then
+            secondDateString = Left(secondDateString, Len(secondDateString) - 2)
+        End If
+    
+        secondmpDateString = "Pick 1 for " & mp & ": " & secondDateString
+        secondFinalDateString = secondFinalDateString & vbCrLf & vbCrLf & secondmpDateString
+    Next mp
+    
+        'get rid of extra space
+        If Left(secondFinalDateString, 4) = vbCrLf & vbCrLf Then
+            secondFinalDateString = Right(secondFinalDateString, Len(secondFinalDateString) - 4)
+        End If
+    
+    ActiveCell.Offset(0, 24).Value = secondFinalDateString
+    
+    Else: MsgBox "The alotted time to schedule meeting 1 has passed"
+    
+    End If
+    
+
+'Third Meeting
+startDate = Application.WorksheetFunction.Max(Date, secondDate)
+endDate = thirdDate
+
+daySpan = DateDiff("d", startDate, endDate)
+
+If endDate > startDate Then
+    For Each mp In meetParts
+        thirdDateString = ""
+        For k = 1 To 3
+thirddiffDate:
+            retryCount = 0
+    
+            Do
+                'find a date that is a week from today and before the end date
+                thirdRndDate = startDate + Int(Rnd() * (daySpan + 1))
+        
+                'avoid infinite loops
+                retryCount = retryCount + 1
+                If retryCount > 100 Then
+                    MsgBox "Could not find a suitable date after 100 tries."
+                Exit Sub
+                End If
+        
+            'no weekends
+            Loop While Weekday(thirdRndDate, vbSunday) = vbSaturday Or Weekday(thirdRndDate, vbSunday) = vbSunday
+    
+            'check that there are no more than 10 meetings in a week
+            weekKey = GetWeekKey(thirdRndDate)
+            If CountMeetingsInAWeek(tblRange, thirdFinalDateString, weekKey) >= 10 Then
+                GoTo thirddiffDate
+            End If
+    
+            'check that there are no more than 2 meetings per subject per week
+            If ReportMeetingsInAWeek(tblRange, weekKey, meetTopics) >= 2 Then
+                GoTo thirddiffDate
+            End If
+    
+            'check that there are no more than 2 meetings per customer per week
+            If CustMeetingsInAWeek(thirdFinalDateString, weekKey) >= 2 Then
+                GoTo thirddiffDate
+            End If
+    
+thirdDiffTime:
+            'find a time
+            thirdRndTime = RndTime(TimeZone)
+            
+            thirdFullDateTime = thirdRndDate + thirdRndTime
+     
+            'Make sure time and dates don't overlap
+            'every meeting is one hour (30min between each meeting)
+            If CloseTime(tblRange, thirdFullDateTime) = True Then
+                GoTo thirdDiffTime
+            End If
+            
+            'Make sure time of the same string doesn't overlap
+            If CloseTimeString(thirdDateString, thirdFullDateTime) = True Then
+                GoTo thirdDiffTime
+            End If
+    
+            'Make sure times of the same cell don't overlap
+            If CloseTimeFinalString(thirdFinalDateString, thirdFullDateTime) = True Then
+                GoTo thirdDiffTime
+            End If
+    
+            'add date and time to the possible date options
+            thirdDateString = thirdDateString & Format(thirdFullDateTime, "mm/dd/yyyy hh:mm AM/PM") & ", "
+    
+        Next k
+    
+        'get rid of end comma
+        If Right(thirdDateString, 2) = ", " Then
+            thirdDateString = Left(thirdDateString, Len(thirdDateString) - 2)
+        End If
+    
+        thirdmpDateString = "Pick 1 for " & mp & ": " & thirdDateString
+        thirdFinalDateString = thirdFinalDateString & vbCrLf & vbCrLf & thirdmpDateString
+    Next mp
+    
+    'get rid of extra space
+    If Left(thirdFinalDateString, 4) = vbCrLf & vbCrLf Then
+        thirdFinalDateString = Right(thirdFinalDateString, Len(thirdFinalDateString) - 4)
+    End If
+    
+    ActiveCell.Offset(0, 25).Value = thirdFinalDateString
+    
+    Else: MsgBox "The alotted time to schedule meeting 2 has passed"
+    End If
+ 
+
+'Fourth Meeting
+' Ensure startDate is not in the past
+startDate = Application.WorksheetFunction.Max(Date, thirdDate)
+endDate = lastDate
+
+daySpan = DateDiff("d", startDate, endDate)
+
+If endDate > startDate Then
+    For Each mp In meetParts
+        lastDateString = ""
+        For n = 1 To 3
+lastdiffDate:
+    
+            retryCount = 0
+            Do
+                'find a date that is a week from today and before the end date
+                lastRndDate = startDate + Int(Rnd() * (daySpan + 1))
+        
+                'avoid infinite loops
+                retryCount = retryCount + 1
+                If retryCount > 100 Then
+                    MsgBox "Could not find a suitable date after 100 tries."
+                    Exit Sub
+                End If
+    
+            'no weekends
+            Loop While Weekday(lastRndDate, vbSunday) = vbSaturday Or Weekday(lastRndDate, vbSunday) = vbSunday
+    
+            'check that there are no more than 10 meetings in a week
+            weekKey = GetWeekKey(lastRndDate)
+            If CountMeetingsInAWeek(tblRange, lastFinalDateString, weekKey) >= 10 Then
+                GoTo lastdiffDate
+            End If
+    
+            'check that there are no more than 2 meetings per subject per week
+            If ReportMeetingsInAWeek(tblRange, weekKey, meetTopics) >= 2 Then
+                GoTo lastdiffDate
+            End If
+    
+            'check that there are no more than 2 meetings per customer per week
+            If CustMeetingsInAWeek(lastFinalDateString, weekKey) >= 2 Then
+                GoTo lastdiffDate
+            End If
+    
+lastDiffTime:
+            'find a time
+            lastRndTime = RndTime(TimeZone)
+            
+            lastFullDateTime = lastRndDate + lastRndTime
+     
+            'Make sure time and dates don't overlap
+            'every meeting is one hour (30min between each meeting)
+            If CloseTime(tblRange, lastFullDateTime) = True Then
+                GoTo lastDiffTime
+            End If
+            
+            'Make sure time of the same string doesn't overlap
+            If CloseTimeString(lastDateString, lastFullDateTime) = True Then
+                GoTo lastDiffTime
+            End If
+            
+            'Make sure times of the same cell don't overlap
+            If CloseTimeFinalString(lastFinalDateString, lastFullDateTime) = True Then
+                GoTo lastDiffTime
+            End If
+    
+            'add date and time to the possible date options
+            lastDateString = lastDateString & Format(lastFullDateTime, "mm/dd/yyyy hh:mm AM/PM") & ", "
+    
+        Next n
+    
+        'get rid of end comma
+        If Right(lastDateString, 2) = ", " Then
+            lastDateString = Left(lastDateString, Len(lastDateString) - 2)
+        End If
+    
+        lastmpDateString = "Pick 1 for " & mp & ": " & lastDateString
+        lastFinalDateString = lastFinalDateString & vbCrLf & vbCrLf & lastmpDateString
+    Next mp
+    
+    'get rid of extra space
+    If Left(lastFinalDateString, 4) = vbCrLf & vbCrLf Then
+        lastFinalDateString = Right(lastFinalDateString, Len(lastFinalDateString) - 4)
+    End If
+    
+    ActiveCell.Offset(0, 26).Value = lastFinalDateString
+    
+    Else: MsgBox "The alotted time to schedule meeting 3 has passed"
+    End If
+    
+'Other Customer Types
+Else:
+'Second Meeting
+    Dim m As Long
+    ' Ensure startDate is not in the past
+    startDate = Application.WorksheetFunction.Max(Date, thirdDate)
+    endDate = lastDate
+
+    daySpan = DateDiff("d", startDate, endDate)
+
+If endDate > startDate Then
+    For Each mp In meetParts
+        secondDateString = ""
+        For m = 1 To 3
+meetdiffDate:
+            retryCount = 0
+            Do
+                'find a date between onboarding and exp date
+                secondRndDate = startDate + Int(Rnd() * (daySpan + 1))
+        
+                'avoid infinite loops
+                retryCount = retryCount + 1
+                If retryCount > 100 Then
+                    MsgBox "Could not find a suitable date after 100 tries."
+                    Exit Sub
+                End If
+        
+            'no weekends
+            Loop While Weekday(secondRndDate, vbSunday) = vbSaturday Or Weekday(secondRndDate, vbSunday) = vbSunday
+    
+            'check that there are no more than 10 meetings in a week
+            weekKey = GetWeekKey(secondRndDate)
+            If CountMeetingsInAWeek(tblRange, secondFinalDateString, weekKey) >= 10 Then
+                GoTo meetdiffDate
+            End If
+    
+            'check that there are no more than 2 meetings per subject per week
+            If ReportMeetingsInAWeek(tblRange, weekKey, meetTopics) >= 2 Then
+                GoTo meetdiffDate
+            End If
+    
+            'check that there are no more than 2 meetings per customer per week
+            If CustMeetingsInAWeek(secondFinalDateString, weekKey) >= 2 Then
+                GoTo meetdiffDate
+            End If
+    
+meetDiffTime:
+            'find a time
+            secondRndTime = RndTime(TimeZone)
+            secondFullDateTime = secondRndDate + secondRndTime
+     
+            'Make sure time and dates don't overlap
+            'every meeting is one hour (30min between each meeting)
+            If CloseTime(tblRange, secondFullDateTime) = True Then
+                GoTo meetDiffTime
+            End If
+            
+            'Make sure time of the same string doesn't overlap
+            If CloseTimeString(secondDateString, secondFullDateTime) = True Then
+                GoTo meetDiffTime
+            End If
+            
+            'Make sure times of the same cell don't overlap
+            If CloseTimeFinalString(secondFinalDateString, secondFullDateTime) = True Then
+                GoTo meetDiffTime
+            End If
+    
+            'add date and time to the possible date options
+            secondDateString = secondDateString & Format(secondFullDateTime, "mm/dd/yyyy hh:mm AM/PM") & ", "
+    
+        Next m
+    
+        'get rid of end comma
+        If Right(secondDateString, 2) = ", " Then
+            secondDateString = Left(secondDateString, Len(secondDateString) - 2)
+        End If
+    
+        secondmpDateString = "Pick 1 for " & mp & ": " & secondDateString
+        secondFinalDateString = secondFinalDateString & vbCrLf & vbCrLf & secondmpDateString
+    Next mp
+    
+    'get rid of extra space
+    If Left(secondFinalDateString, 4) = vbCrLf & vbCrLf Then
+        secondFinalDateString = Right(secondFinalDateString, Len(secondFinalDateString) - 4)
+    End If
+    
+    ActiveCell.Offset(0, 24).Value = secondFinalDateString
+
+    Else: MsgBox "The alotted time to schedule a meeting has passed"
+    
+    End If
+End If
+
+'
+End Sub
+
+
+
+Sub lateScheduling()
+'
+' lateScheduling Macro
+'
+Randomize
+
+'Number of meetings according to reports
+Dim meetNum As Long
+Dim cell As Range
+Dim meetTopics As String
+Dim custType As String
+
+'Quarterly Dates
+Dim joinDate As Date
+Dim renewDate As Date
+Dim firstDate As Date
+Dim secondDate As Date
+Dim thirdDate As Date
+Dim lastDate As Date
+Dim startDate As Date
+Dim endDate As Date
+Dim daySpan As Long
+
+'Set a table to avoid date conflicts
+Dim tblRange As Range
+Dim lastRow As Long
+
+'Onboarding Meeting variables
+Dim firstRndDate As Date
+Dim firstDateString As String
+Dim firstRndTime As Date
+Dim firstRndHr As Integer
+Dim firstRndMin As Integer
+Dim firstFullDateTime As Date
+Dim firstFinalDateString As String
+Dim i As Long
+
+'second Meeting variables
+Dim secondRndDate As Date
+Dim secondDateString As String
+Dim secondRndTime As Date
+Dim secondRndHr As Integer
+Dim secondRndMin As Integer
+Dim secondFullDateTime As Date
+Dim j As Long
+Dim secondmpDateString As String
+Dim secondFinalDateString As String
+
+'third Meeting variables
+Dim thirdRndDate As Date
+Dim thirdDateString As String
+Dim thirdRndTime As Date
+Dim thirdRndHr As Integer
+Dim thirdRndMin As Integer
+Dim thirdFullDateTime As Date
+Dim k As Long
+Dim thirdmpDateString As String
+Dim thirdFinalDateString As String
+
+'fourth Meeting variables
+Dim lastRndDate As Date
+Dim lastDateString As String
+Dim lastRndTime As Date
+Dim lastRndHr As Integer
+Dim lastRndMin As Integer
+Dim lastFullDateTime As Date
+Dim n As Long
+Dim lastmpDateString As String
+Dim lastFinalDateString As String
+ 
+ 'Time conflict variables
+Dim weekKey As String
+Dim retryCount As Integer
+
+'Time Zone
+Dim TimeZone As String
+'Meeting Topic variables
+Dim meetParts() As String
+Dim mp As Variant
+Dim l As Long
+Dim meetString As String
+
+'check to see the time frame
+TimeZone = ActiveCell.Offset(0, 1).Value
+
+'check to see if the cell selected is empty
+    If ActiveCell.Offset(0, 23).Value <> "" Then
+        MsgBox "Meetings already scheduled"
+        Exit Sub
+    End If
+'find number of meetings
+    meetNum = 0
+    meetTopics = ""
+    For Each cell In Range(ActiveCell.Offset(0, 7), ActiveCell.Offset(0, 18))
+        If cell.Value > 0 Then
+            meetNum = meetNum + 1
+            meetTopics = meetTopics & CStr(cell.Value) & ", "
+        End If
+    Next cell
+    
+    'get rid of end comma
+    If Right(meetTopics, 2) = ", " Then
+        meetTopics = Left(meetTopics, Len(meetTopics) - 2)
+    End If
+    
+    
+'If DSS Member, 4 meetings per subject
+    If ActiveCell.Offset(0, 2).Value = "DSS Member" Then
+        custType = "DSS"
+        meetNum = Application.WorksheetFunction.Ceiling(meetNum / 2, 1)
+    
+'If not DSS and have two subjects, make one meeting with two subjects
+    Else
+        'fit two topics into one meeting
+        custType = "Other"
+       meetNum = Application.WorksheetFunction.Ceiling(meetNum / 2, 1)
+    End If
+
+'split the meetTopics
+    meetParts() = SplitEveryOtherComma(meetTopics)
+    meetString = ""
+    For Each mp In meetParts
+        meetString = meetString & "1 for " & mp & ", "
+    Next mp
+    
+    'get rid of end comma
+    If Right(meetString, 2) = ", " Then
+        meetString = Left(meetString, Len(meetString) - 2)
+    End If
+    
+    
+'No Topics
+    If meetNum = 0 Then
+        MsgBox "No Meetings To Schedule"
+        Exit Sub
+    End If
+    
+    
+'End Dates
+joinDate = DateValue(ActiveCell.Offset(0, 4))
+renewDate = DateValue(ActiveCell.Offset(0, 5))
+firstDate = DateAdd("d", 14, joinDate)
+secondDate = DateAdd("m", 3, firstDate)
+thirdDate = DateAdd("m", 3, secondDate)
+lastDate = DateAdd("m", 3, thirdDate)
+
+'Renewal Date
+    If DateDiff("d", Date, renewDate) < 0 Then
+        MsgBox "Renewal Date Has Passed"
+        Exit Sub
+    End If
+
+'Set the table to traverse in order to avoid conflict
+'find the last used row from X:AA
+lastRow = Cells(Rows.count, "X").End(xlUp).Row
+If Cells(Rows.count, "Y").End(xlUp).Row > lastRow Then lastRow = Cells(Rows.count, "Y").End(xlUp).Row
+If Cells(Rows.count, "Z").End(xlUp).Row > lastRow Then lastRow = Cells(Rows.count, "Z").End(xlUp).Row
+If Cells(Rows.count, "AA").End(xlUp).Row > lastRow Then lastRow = Cells(Rows.count, "AA").End(xlUp).Row
+
+Set tblRange = Range("X3:AA" & lastRow)
+
+' Ensure startDate is not in the past
+startDate = Application.WorksheetFunction.Max(Date, joinDate)
+endDate = firstDate
+
+daySpan = DateDiff("d", startDate, endDate)
+
+' Make sure the end date is after today
+'only new customers need an onboarding meeting
+If endDate > startDate Then
+'Onboarding Scheduling
+firstFinalDateString = ""
+For i = 1 To 3      'Offer 3 options
+firstdiffDate:
+
+    retryCount = 0
+    Do
+        'find a date that is a week from today and before the end date
+        firstRndDate = startDate + Int(Rnd() * (daySpan + 1))
+        
+        'avoid infinite loops
+        retryCount = retryCount + 1
+        If retryCount > 100 Then
+            MsgBox "Could not find a suitable date after 100 tries."
+            Exit Sub
+        End If
+        
+    'no weekends
+    Loop While Weekday(firstRndDate, vbSunday) = vbSaturday Or Weekday(firstRndDate, vbSunday) = vbSunday
+    
+    'check that there are no more than 10 meetings in a week
+    weekKey = GetWeekKey(firstRndDate)
+    If CountMeetingsInAWeek(tblRange, firstFinalDateString, weekKey) >= 10 Then
+        GoTo firstdiffDate
+    End If
+    
+    
+firstdiffTime:
+    'find a time
+    firstRndTime = RndTime(TimeZone)
+            
+    firstFullDateTime = firstRndDate + firstRndTime
+     
+    'Make sure time and dates don't overlap
+    'every meeting is one hour (30min between each meeting)
+    If CloseTime(tblRange, firstFullDateTime) = True Then
+        GoTo firstdiffTime
+    End If
+    
+    'Make sure time of the same string doesn't overlap
+    If CloseTimeString(firstDateString, firstFullDateTime) = True Then
+        GoTo firstdiffTime
+    End If
+    
+    'add date and time to the possible date options
+    firstDateString = firstDateString & Format(firstFullDateTime, "mm/dd/yyyy hh:mm AM/PM") & ", "
+    
+Next i
+
+   'get rid of end comma
+    If Right(firstDateString, 2) = ", " Then
+        firstFinalDateString = Left(firstDateString, Len(firstDateString) - 2)
+    End If
+    
+    ActiveCell.Offset(0, 23).Value = firstFinalDateString
+
+End If
+
+
+'DSS Members' Quarterly Meeting Scheduling
+If custType = "DSS" Then
+    ' Ensure startDate is not in the past
+    startDate = Application.WorksheetFunction.Max(Date, firstDate)
+    endDate = secondDate
+
+    daySpan = DateDiff("d", startDate, endDate)
+    
+    If endDate > startDate Then
+    'Second Meeting
+        For Each mp In meetParts
+            secondDateString = ""
+            For j = 1 To 3
+seconddiffDate:
+                retryCount = 0
+                Do
+                    'find a date that is a week from today and before the end date
+                    secondRndDate = startDate + Int(Rnd() * (daySpan + 1))
+        
+                    'avoid infinite loops
+                    retryCount = retryCount + 1
+                    If retryCount > 100 Then
+                        MsgBox "Could not find a suitable date after 100 tries."
+                        Exit Sub
+                    End If
+                    
+                'no weekends
+                Loop While Weekday(secondRndDate, vbSunday) = vbSaturday Or Weekday(secondRndDate, vbSunday) = vbSunday
+    
+                'check that there are no more than 10 meetings in a week
+                weekKey = GetWeekKey(secondRndDate)
+                If CountMeetingsInAWeek(tblRange, secondFinalDateString, weekKey) >= 10 Then
+                    GoTo seconddiffDate
+                End If
+    
+                'check that there are no more than 2 meetings per subject per week
+                If ReportMeetingsInAWeek(tblRange, weekKey, meetTopics) >= 2 Then
+                    GoTo seconddiffDate
+                End If
+    
+                'check that there are no more than 2 meetings per customer per week
+                If CustMeetingsInAWeek(secondFinalDateString, weekKey) >= 2 Then
+                    GoTo seconddiffDate
+                End If
+
+secondDiffTime:
+                'find a time
+                secondRndTime = RndTime(TimeZone)
+                secondFullDateTime = secondRndDate + secondRndTime
+    
+                'Make sure time and dates don't overlap
+                'every meeting is one hour (30min between each meeting)
+                If CloseTime(tblRange, secondFullDateTime) = True Then
+                    GoTo secondDiffTime
+                End If
+                
+                'Make sure time of the same string doesn't overlap
+                If CloseTimeString(secondDateString, secondFullDateTime) = True Then
+                    GoTo secondDiffTime
+                End If
+            
+                'Make sure times of the same cell don't overlap
+                If CloseTimeFinalString(secondFinalDateString, secondFullDateTime) = True Then
+                    GoTo secondDiffTime
+                End If
+    
+                'add date and time to the possible date options
+                secondDateString = secondDateString & Format(secondFullDateTime, "mm/dd/yyyy hh:mm AM/PM") & ", "
+
+            Next j
+    
+        'get rid of end comma
+        If Right(secondDateString, 2) = ", " Then
+            secondDateString = Left(secondDateString, Len(secondDateString) - 2)
+        End If
+    
+        secondmpDateString = "Pick 1 for " & mp & ": " & secondDateString
+        secondFinalDateString = secondFinalDateString & vbCrLf & vbCrLf & secondmpDateString
+    Next mp
+    
+        'get rid of extra space
+        If Left(secondFinalDateString, 4) = vbCrLf & vbCrLf Then
+            secondFinalDateString = Right(secondFinalDateString, Len(secondFinalDateString) - 4)
+        End If
+    
+    ActiveCell.Offset(0, 24).Value = secondFinalDateString
+    
+    Else: MsgBox "The alotted time to schedule meeting 1 has passed"
+    
+    End If
+    
+
+'Third Meeting
+startDate = Application.WorksheetFunction.Max(Date, secondDate)
+endDate = thirdDate
+
+daySpan = DateDiff("d", startDate, endDate)
+
+If endDate > startDate Then
+    For Each mp In meetParts
+        thirdDateString = ""
+        For k = 1 To 3
+thirddiffDate:
+            retryCount = 0
+    
+            Do
+                'find a date that is a week from today and before the end date
+                thirdRndDate = startDate + Int(Rnd() * (daySpan + 1))
+        
+                'avoid infinite loops
+                retryCount = retryCount + 1
+                If retryCount > 100 Then
+                    MsgBox "Could not find a suitable date after 100 tries."
+                Exit Sub
+                End If
+        
+            'no weekends
+            Loop While Weekday(thirdRndDate, vbSunday) = vbSaturday Or Weekday(thirdRndDate, vbSunday) = vbSunday
+    
+            'check that there are no more than 10 meetings in a week
+            weekKey = GetWeekKey(thirdRndDate)
+            If CountMeetingsInAWeek(tblRange, thirdFinalDateString, weekKey) >= 10 Then
+                GoTo thirddiffDate
+            End If
+    
+            'check that there are no more than 2 meetings per subject per week
+            If ReportMeetingsInAWeek(tblRange, weekKey, meetTopics) >= 2 Then
+                GoTo thirddiffDate
+            End If
+    
+            'check that there are no more than 2 meetings per customer per week
+            If CustMeetingsInAWeek(thirdFinalDateString, weekKey) >= 2 Then
+                GoTo thirddiffDate
+            End If
+    
+thirdDiffTime:
+            'find a time
+            thirdRndTime = RndTime(TimeZone)
+            
+            thirdFullDateTime = thirdRndDate + thirdRndTime
+     
+            'Make sure time and dates don't overlap
+            'every meeting is one hour (30min between each meeting)
+            If CloseTime(tblRange, thirdFullDateTime) = True Then
+                GoTo thirdDiffTime
+            End If
+            
+            'Make sure time of the same string doesn't overlap
+            If CloseTimeString(thirdDateString, thirdFullDateTime) = True Then
+                GoTo thirdDiffTime
+            End If
+    
+            'Make sure times of the same cell don't overlap
+            If CloseTimeFinalString(thirdFinalDateString, thirdFullDateTime) = True Then
+                GoTo thirdDiffTime
+            End If
+    
+            'add date and time to the possible date options
+            thirdDateString = thirdDateString & Format(thirdFullDateTime, "mm/dd/yyyy hh:mm AM/PM") & ", "
+    
+        Next k
+    
+        'get rid of end comma
+        If Right(thirdDateString, 2) = ", " Then
+            thirdDateString = Left(thirdDateString, Len(thirdDateString) - 2)
+        End If
+    
+        thirdmpDateString = "Pick 1 for " & mp & ": " & thirdDateString
+        thirdFinalDateString = thirdFinalDateString & vbCrLf & vbCrLf & thirdmpDateString
+    Next mp
+    
+    'get rid of extra space
+    If Left(thirdFinalDateString, 4) = vbCrLf & vbCrLf Then
+        thirdFinalDateString = Right(thirdFinalDateString, Len(thirdFinalDateString) - 4)
+    End If
+    
+    ActiveCell.Offset(0, 25).Value = thirdFinalDateString
+    
+    Else: MsgBox "The alotted time to schedule meeting 2 has passed"
+    End If
+ 
+
+'Fourth Meeting
+' Ensure startDate is not in the past
+startDate = Application.WorksheetFunction.Max(Date, thirdDate)
+endDate = renewDate - 1 'this is to ensure that all meetings take place before the renew date considering time zone differences
+
+daySpan = DateDiff("d", startDate, endDate)
+
+If endDate > startDate Then
+    For Each mp In meetParts
+        lastDateString = ""
+        For n = 1 To 3
+lastdiffDate:
+    
+            retryCount = 0
+            Do
+                'find a date that is a week from today and before the end date
+                lastRndDate = startDate + Int(Rnd() * (daySpan + 1))
+        
+                'avoid infinite loops
+                retryCount = retryCount + 1
+                If retryCount > 100 Then
+                    MsgBox "Could not find a suitable date after 100 tries."
+                    Exit Sub
+                End If
+    
+            'no weekends
+            Loop While Weekday(lastRndDate, vbSunday) = vbSaturday Or Weekday(lastRndDate, vbSunday) = vbSunday
+    
+            'check that there are no more than 10 meetings in a week
+            weekKey = GetWeekKey(lastRndDate)
+            If CountMeetingsInAWeek(tblRange, lastFinalDateString, weekKey) >= 10 Then
+                GoTo lastdiffDate
+            End If
+    
+            'check that there are no more than 2 meetings per subject per week
+            If ReportMeetingsInAWeek(tblRange, weekKey, meetTopics) >= 2 Then
+                GoTo lastdiffDate
+            End If
+    
+            'check that there are no more than 2 meetings per customer per week
+            If CustMeetingsInAWeek(lastFinalDateString, weekKey) >= 2 Then
+                GoTo lastdiffDate
+            End If
+    
+lastDiffTime:
+            'find a time
+            lastRndTime = RndTime(TimeZone)
+            
+            lastFullDateTime = lastRndDate + lastRndTime
+     
+            'Make sure time and dates don't overlap
+            'every meeting is one hour (30min between each meeting)
+            If CloseTime(tblRange, lastFullDateTime) = True Then
+                GoTo lastDiffTime
+            End If
+            
+            'Make sure time of the same string doesn't overlap
+            If CloseTimeString(lastDateString, lastFullDateTime) = True Then
+                GoTo lastDiffTime
+            End If
+            
+            'Make sure times of the same cell don't overlap
+            If CloseTimeFinalString(lastFinalDateString, lastFullDateTime) = True Then
+                GoTo lastDiffTime
+            End If
+    
+            'add date and time to the possible date options
+            lastDateString = lastDateString & Format(lastFullDateTime, "mm/dd/yyyy hh:mm AM/PM") & ", "
+    
+        Next n
+    
+        'get rid of end comma
+        If Right(lastDateString, 2) = ", " Then
+            lastDateString = Left(lastDateString, Len(lastDateString) - 2)
+        End If
+    
+        lastmpDateString = "Pick 1 for " & mp & ": " & lastDateString
+        lastFinalDateString = lastFinalDateString & vbCrLf & vbCrLf & lastmpDateString
+    Next mp
+    
+    'get rid of extra space
+    If Left(lastFinalDateString, 4) = vbCrLf & vbCrLf Then
+        lastFinalDateString = Right(lastFinalDateString, Len(lastFinalDateString) - 4)
+    End If
+    
+    ActiveCell.Offset(0, 26).Value = lastFinalDateString
+    
+    Else: MsgBox "The alotted time to schedule meeting 3 has passed"
+    End If
+    
+'Other Customer Types
+Else:
+'Second Meeting
+    Dim m As Long
+    ' Ensure startDate is not in the past
+    startDate = Application.WorksheetFunction.Max(Date, thirdDate)
+    endDate = renewDate - 1 'this is to ensure that all meetings take place before the renew date considering time zone differences
+
+    daySpan = DateDiff("d", startDate, endDate)
+
+If endDate > startDate Then
+    For Each mp In meetParts
+        secondDateString = ""
+        For m = 1 To 3
+meetdiffDate:
+            retryCount = 0
+            Do
+                'find a date between onboarding and exp date
+                secondRndDate = startDate + Int(Rnd() * (daySpan + 1))
+        
+                'avoid infinite loops
+                retryCount = retryCount + 1
+                If retryCount > 100 Then
+                    MsgBox "Could not find a suitable date after 100 tries."
+                    Exit Sub
+                End If
+        
+            'no weekends
+            Loop While Weekday(secondRndDate, vbSunday) = vbSaturday Or Weekday(secondRndDate, vbSunday) = vbSunday
+    
+            'check that there are no more than 10 meetings in a week
+            weekKey = GetWeekKey(secondRndDate)
+            If CountMeetingsInAWeek(tblRange, secondFinalDateString, weekKey) >= 10 Then
+                GoTo meetdiffDate
+            End If
+    
+            'check that there are no more than 2 meetings per subject per week
+            If ReportMeetingsInAWeek(tblRange, weekKey, meetTopics) >= 2 Then
+                GoTo meetdiffDate
+            End If
+    
+            'check that there are no more than 2 meetings per customer per week
+            If CustMeetingsInAWeek(secondFinalDateString, weekKey) >= 2 Then
+                GoTo meetdiffDate
+            End If
+    
+meetDiffTime:
+            'find a time
+            secondRndTime = RndTime(TimeZone)
+            
+            secondFullDateTime = secondRndDate + secondRndTime
+     
+            'Make sure time and dates don't overlap
+            'every meeting is one hour (30min between each meeting)
+            If CloseTime(tblRange, secondFullDateTime) = True Then
+                GoTo meetDiffTime
+            End If
+            
+            'Make sure time of the same string doesn't overlap
+            If CloseTimeString(secondDateString, secondFullDateTime) = True Then
+                GoTo meetDiffTime
+            End If
+            
+            'Make sure times of the same cell don't overlap
+            If CloseTimeFinalString(secondFinalDateString, secondFullDateTime) = True Then
+                GoTo meetDiffTime
+            End If
+    
+            'add date and time to the possible date options
+            secondDateString = secondDateString & Format(secondFullDateTime, "mm/dd/yyyy hh:mm AM/PM") & ", "
+    
+        Next m
+    
+        'get rid of end comma
+        If Right(secondDateString, 2) = ", " Then
+            secondDateString = Left(secondDateString, Len(secondDateString) - 2)
+        End If
+    
+        secondmpDateString = "Pick 1 for " & mp & ": " & secondDateString
+        secondFinalDateString = secondFinalDateString & vbCrLf & vbCrLf & secondmpDateString
+    Next mp
+    
+    'get rid of extra space
+    If Left(secondFinalDateString, 4) = vbCrLf & vbCrLf Then
+        secondFinalDateString = Right(secondFinalDateString, Len(secondFinalDateString) - 4)
+    End If
+    
+    ActiveCell.Offset(0, 24).Value = secondFinalDateString
+
+    Else: MsgBox "The alotted time to schedule a meeting has passed"
+    
+    End If
+End If
+
+'
+End Sub
